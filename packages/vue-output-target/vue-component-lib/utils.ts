@@ -43,23 +43,18 @@ const getElementClasses = (
 };
 
 /**
- * Create a callback to define a Vue component wrapper around a Web Component.
- *
- * @prop name - The component tag name (i.e. `ion-button`)
- * @prop componentProps - An array of properties on the
- * component. These usually match up with the @Prop definitions
- * in each component's TSX file.
- * @prop customElement - An option custom element instance to pass
- * to customElements.define. Only set if `includeImportCustomElements: true` in your config.
- * @prop modelProp - The prop that v-model binds to (i.e. value)
- * @prop modelUpdateEvent - The event that is fired from your Web Component when the value changes (i.e. ionChange)
- * @prop externalModelUpdateEvent - The external event to fire from your Vue component when modelUpdateEvent fires. This is used for ensuring that v-model references have been
- * correctly updated when a user's event callback fires.
+ * Utility function to define a Vue wrapper component for a Web Component.
+ * @param {string} name - The tag name of the Web Component (e.g., 'gravity-button').
+ * @param {Function} defineCustomElement - Function to define the Web Component.
+ * @param {Array} componentProps - Array of properties and custom events supported by the Web Component.
+ * @param {string} [modelProp] - Prop that v-model binds to (optional).
+ * @param {string} [modelUpdateEvent] - Event that triggers a model update (optional).
+ * @param {string} [externalModelUpdateEvent] - External event to fire when the model is updated (optional).
  */
 export const defineContainer = <Props, VModelType = string | number | boolean>(
   name: string,
   defineCustomElement: any,
-  componentProps: string[] = [],
+  componentProps: string[][] = [],
   modelProp?: string,
   modelUpdateEvent?: string,
   externalModelUpdateEvent?: string
@@ -74,6 +69,13 @@ export const defineContainer = <Props, VModelType = string | number | boolean>(
     defineCustomElement();
   }
 
+  // Destructure the array of component properties and custom events
+  const [componentProperties, componentCustomEvents] = componentProps;
+
+  /**
+   * Vue component wrapper around the Web Component.
+   * Handles property binding, event handling, and v-model support.
+   */
   const Container = defineComponent<Props & InputProps<VModelType>>((props, { attrs, slots, emit }) => {
     let modelPropValue = props[modelProp];
     const containerRef = ref<HTMLElement>();
@@ -81,25 +83,43 @@ export const defineContainer = <Props, VModelType = string | number | boolean>(
     const onVnodeBeforeMount = (vnode: VNode) => {
       // Add a listener to tell Vue to update the v-model
       if (vnode.el) {
-        const eventsNames = Array.isArray(modelUpdateEvent) ? modelUpdateEvent : [modelUpdateEvent];
-        eventsNames.forEach((eventName: string) => {
-          vnode.el!.addEventListener(eventName.toLowerCase(), (e: Event) => {
-            modelPropValue = (e?.target as any)[modelProp];
-            emit(UPDATE_VALUE_EVENT, modelPropValue);
+        if (modelUpdateEvent) {
+          const eventsNames = Array.isArray(modelUpdateEvent) ? modelUpdateEvent : [modelUpdateEvent];
+          eventsNames.forEach((eventName: string) => {
+            vnode.el!.addEventListener(eventName, (e: Event) => {
+              modelPropValue = (e?.target as any)[modelProp];
+              emit(UPDATE_VALUE_EVENT, modelPropValue);
 
-            /**
-             * We need to emit the change event here
-             * rather than on the web component to ensure
-             * that any v-model bindings have been updated.
-             * Otherwise, the developer will listen on the
-             * native web component, but the v-model will
-             * not have been updated yet.
-             */
-            if (externalModelUpdateEvent) {
-              emit(externalModelUpdateEvent, e);
-            }
+              /**
+               * We need to emit the change event here
+               * rather than on the web component to ensure
+               * that any v-model bindings have been updated.
+               * Otherwise, the developer will listen on the
+               * native web component, but the v-model will
+               * not have been updated yet.
+               */
+              if (externalModelUpdateEvent) {
+                emit(externalModelUpdateEvent, e);
+              }
+            });
           });
-        });
+        }
+
+        /**
+         * Attach event listeners for custom events emitted by the web component.
+         * This makes custom events accessible for declarative inline event handlers using both camelCase and kebab-case.
+         *
+         * Example:
+         * If the StencilJS component emits an event called "customEvent",
+         * then both `@customEvent` and `@custom-event` can be used as inline handlers.
+         */
+        if (componentCustomEvents?.length) {
+          componentCustomEvents.forEach((eventName) => {
+            vnode.el.addEventListener(eventName, (e: CustomEvent) => {
+              emit(eventName, e);
+            });
+          });
+        }
       }
     };
 
@@ -146,7 +166,7 @@ export const defineContainer = <Props, VModelType = string | number | boolean>(
         ref: containerRef,
         class: getElementClasses(containerRef, classes),
         onClick: handleClick,
-        onVnodeBeforeMount: modelUpdateEvent ? onVnodeBeforeMount : undefined,
+        onVnodeBeforeMount,
       };
 
       /**
@@ -193,13 +213,25 @@ export const defineContainer = <Props, VModelType = string | number | boolean>(
       [ROUTER_LINK_VALUE]: DEFAULT_EMPTY_PROP,
     };
 
-    componentProps.forEach((componentProp) => {
-      Container.props[componentProp] = DEFAULT_EMPTY_PROP;
-    });
+    // Map properties to proxy component for one-way data binding.
+    if (componentProperties?.length) {
+      componentProperties.forEach((componentProp) => {
+        Container.props[componentProp] = DEFAULT_EMPTY_PROP;
+      });
+    }
+
+    // Register custom events as Vue emits.
+    if (componentCustomEvents?.length) {
+      Container.emits = [...(Array.isArray(Container.emits) ? Container.emits : []), ...componentCustomEvents];
+    }
 
     if (modelProp) {
       Container.props[MODEL_VALUE] = DEFAULT_EMPTY_PROP;
-      Container.emits = [UPDATE_VALUE_EVENT, externalModelUpdateEvent];
+      Container.emits = [
+        ...(Array.isArray(Container.emits) ? Container.emits : []),
+        UPDATE_VALUE_EVENT,
+        externalModelUpdateEvent,
+      ];
     }
   }
 

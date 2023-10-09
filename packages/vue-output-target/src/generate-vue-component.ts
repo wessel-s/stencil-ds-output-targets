@@ -13,13 +13,14 @@ export const createComponentDefinition =
     const importAs = includeCustomElement ? 'define' + tagNameAsPascal : 'undefined';
 
     let props: string[] = [];
+    let events: string[] = [];
 
     if (Array.isArray(cmpMeta.properties) && cmpMeta.properties.length > 0) {
       props = cmpMeta.properties.map((prop) => `'${prop.name}'`);
     }
 
     if (Array.isArray(cmpMeta.events) && cmpMeta.events.length > 0) {
-      props = [...props, ...cmpMeta.events.map((event) => `'${event.name}'`)];
+      events = cmpMeta.events.map((event) => `'${event.name}'`);
     }
 
     const componentType = `${importTypes}.${tagNameAsPascal}`;
@@ -30,23 +31,25 @@ export const createComponentDefinition =
     let templateString = `
 export const ${tagNameAsPascal} = /*@__PURE__*/ defineContainer<${componentType}${modelType}>('${cmpMeta.tagName}', ${importAs}`;
 
-    if (props.length > 0) {
-      templateString += `, [
-  ${props.length > 0 ? props.join(',\n  ') : ''}
-]`;
-      /**
-       * If there are no props,
-       * but v-model is still used,
-       * make sure we pass in an empty array
-       * otherwise all of the defineContainer properties
-       * will be off by one space.
-       * Note: If you are using v-model then
-       * the props array should never be empty
-       * as there must be a prop for v-model to update,
-       * but this check is there so builds do not crash.
-       */
-    } else if (findModel) {
-      templateString += `, []`;
+    /**
+     * If there are no props,
+     * but v-model is still used,
+     * make sure we pass in an empty array
+     * otherwise all of the defineContainer properties
+     * will be off by one space.
+     * Note: If you are using v-model then
+     * the props array should never be empty
+     * as there must be a prop for v-model to update,
+     * but this check is there so builds do not crash.
+     */
+
+    if (props.length > 0 || events.length > 0) {
+      const combinedArray = `[${props.length > 0 ? `[${props.join(', ')}]` : ''}${
+        events.length > 0 ? `, [${events.join(', ')}]` : ''
+      }]`;
+      templateString += `, ${combinedArray}`;
+    } else {
+      templateString += `, []`; // Empty array when neither props nor events are provided
     }
 
     if (findModel) {
