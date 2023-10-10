@@ -10,7 +10,7 @@ describe('createComponentDefinition', () => {
       events: [],
     });
     expect(output).toEqual(`
-export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', undefined);
+export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', undefined, []);
 `);
   });
   it('should create a Vue component with custom element support', () => {
@@ -22,7 +22,7 @@ export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>
       events: [],
     });
     expect(output).toEqual(`
-export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', defineMyComponent);
+export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', defineMyComponent, []);
 `);
   });
 
@@ -79,10 +79,7 @@ export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>
     });
 
     expect(output).toEqual(`
-export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent, Components.MyComponent["value"]>('my-component', undefined, [
-  'value',
-  'ionChange'
-],
+export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent, Components.MyComponent["value"]>('my-component', undefined, [['value'], ['ionChange']],
 'value', 'v-ionChange', 'ionChange');
 `);
   });
@@ -136,19 +133,17 @@ export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent,
           },
         },
       ],
+      methods: [], // Adding an empty methods array here to resolve TS error
     });
 
     expect(output).toEqual(`
-export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent, Components.MyComponent["value"]>('my-component', undefined, [
-  'value',
-  'ionChange'
-],
+export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent, Components.MyComponent["value"]>('my-component', undefined, [['value'], ['ionChange']],
 'value', 'v-ionChange', 'ionChange');
 `);
   });
 
   it('should pass event references to the createCommonRender function', () => {
-    const generateComponentDefinition = createComponentDefinition('Components');
+    const generateComponentDefinition = createComponentDefinition('Components', []);
     const output = generateComponentDefinition({
       properties: [],
       tagName: 'my-component',
@@ -175,14 +170,12 @@ export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent,
     });
 
     expect(output).toEqual(`
-export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', undefined, [
-  'my-event'
-]);
+export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', undefined, [, ['my-event']]);
 `);
   });
 
   it('should add a prop with Reference to the original component library prop type', () => {
-    const generateComponentDefinition = createComponentDefinition('Components');
+    const generateComponentDefinition = createComponentDefinition('Components', []);
     const output = generateComponentDefinition({
       properties: [
         {
@@ -209,9 +202,7 @@ export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>
     });
 
     expect(output).toEqual(`
-export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', undefined, [
-  'myProp'
-]);
+export const MyComponent = /*@__PURE__*/ defineContainer<Components.MyComponent>('my-component', undefined, [['myProp']]);
 `);
   });
 });

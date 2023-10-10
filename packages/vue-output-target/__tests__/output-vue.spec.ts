@@ -1,4 +1,4 @@
-import { ComponentCompilerMeta } from '@stencil/core/internal';
+import { ComponentCompilerMeta, Config } from '@stencil/core/internal';
 import { generateProxies } from '../src/output-vue';
 import { PackageJSON, OutputTargetVue } from '../src/types';
 
